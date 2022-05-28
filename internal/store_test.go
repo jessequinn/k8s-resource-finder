@@ -2,12 +2,31 @@ package internal
 
 import (
 	"context"
-	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"reflect"
 	"testing"
+
+	apiv1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 func TestStore_GetUnusedConfigMaps(t *testing.T) {
+	fakeClientSet := fake.NewSimpleClientset(
+		&apiv1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "test",
+			},
+		},
+		&apiv1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-different",
+				Namespace: "test",
+			},
+		},
+	)
+
 	type fields struct {
 		Context                    context.Context
 		Namespaces                 []string
@@ -23,7 +42,26 @@ func TestStore_GetUnusedConfigMaps(t *testing.T) {
 		want    []Item
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "test-different",
+			fields: fields{
+				Context:     context.Background(),
+				Namespaces:  []string{"test"},
+				CoreV1:      fakeClientSet.CoreV1(),
+				usedSecrets: nil,
+				usedConfigMaps: []Item{{
+					Name:       "test",
+					Namespaces: "test",
+				}},
+				usedServiceAccounts:        nil,
+				usedPersistentVolumeClaims: nil,
+			},
+			want: []Item{{
+				Name:       "test-different",
+				Namespaces: "test",
+			}},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

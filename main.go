@@ -75,7 +75,6 @@ func main() {
 	for _, v := range unusedServiceAccounts {
 		println("\t", v.Name, v.Namespaces)
 	}
-
 	println("Unused Persistent Volume Claims")
 	unusedPersistentVolumeClaims, err := k.GetUnusedPersistentVolumeClaims()
 	if err != nil {
