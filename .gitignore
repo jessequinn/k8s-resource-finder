@@ -1,0 +1,10 @@
+*
+
+!.gitignore
+!README.md
+!VERSION
+!LICENSE
+
+!go.mod
+!go.sum
+!main.go
