@@ -1,5 +1,9 @@
 *
 
+!/internal/
+!/internal/*
+!/internal/**.go
+
 !.gitignore
 !README.md
 !VERSION
