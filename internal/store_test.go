@@ -11,11 +11,79 @@ import (
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
-func TestStore_GetUnusedConfigMaps(t *testing.T) {
-	fakeClientSet := fake.NewSimpleClientset(
+var (
+	fakeClientSet = fake.NewSimpleClientset(
+		&apiv1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod",
+				Namespace: "test",
+			},
+			Spec: apiv1.PodSpec{
+				ServiceAccountName: "test-service-account",
+				Volumes: []apiv1.Volume{
+					{
+						VolumeSource: apiv1.VolumeSource{
+							Secret: &apiv1.SecretVolumeSource{
+								SecretName: "test-secret",
+							},
+						},
+					},
+					{
+						VolumeSource: apiv1.VolumeSource{
+							ConfigMap: &apiv1.ConfigMapVolumeSource{
+								LocalObjectReference: apiv1.LocalObjectReference{
+									Name: "test-configmap",
+								},
+							},
+						},
+					},
+					{
+						VolumeSource: apiv1.VolumeSource{
+							PersistentVolumeClaim: &apiv1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "test-persistent-volume",
+							},
+						},
+					},
+				},
+				Containers: []apiv1.Container{
+					{
+						Env: []apiv1.EnvVar{
+							{
+								Name: "test-secret",
+								ValueFrom: &apiv1.EnvVarSource{
+									SecretKeyRef: &apiv1.SecretKeySelector{
+										Key: "test",
+									},
+								},
+							},
+							{
+								Name: "test-configmap",
+								ValueFrom: &apiv1.EnvVarSource{
+									ConfigMapKeyRef: &apiv1.ConfigMapKeySelector{
+										Key: "test",
+									},
+								},
+							},
+						},
+						EnvFrom: []apiv1.EnvFromSource{
+							{
+								SecretRef: &apiv1.SecretEnvSource{
+									LocalObjectReference: apiv1.LocalObjectReference{Name: "test"},
+								},
+							},
+							{
+								ConfigMapRef: &apiv1.ConfigMapEnvSource{
+									LocalObjectReference: apiv1.LocalObjectReference{Name: "test"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		&apiv1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
+				Name:      "test-configmap",
 				Namespace: "test",
 			},
 		},
@@ -25,7 +93,46 @@ func TestStore_GetUnusedConfigMaps(t *testing.T) {
 				Namespace: "test",
 			},
 		},
+		&apiv1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-persistent-volume",
+				Namespace: "test",
+			},
+		},
+		&apiv1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-different",
+				Namespace: "test",
+			},
+		},
+		&apiv1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-secret",
+				Namespace: "test",
+			},
+		},
+		&apiv1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-different",
+				Namespace: "test",
+			},
+		},
+		&apiv1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-service-account",
+				Namespace: "test",
+			},
+		},
+		&apiv1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-different",
+				Namespace: "test",
+			},
+		},
 	)
+)
+
+func TestStore_GetUnusedConfigMaps(t *testing.T) {
 	type fields struct {
 		Context                    context.Context
 		Namespaces                 []string
@@ -55,10 +162,16 @@ func TestStore_GetUnusedConfigMaps(t *testing.T) {
 				usedServiceAccounts:        nil,
 				usedPersistentVolumeClaims: nil,
 			},
-			want: []Item{{
-				Name:       "test-different",
-				Namespaces: "test",
-			}},
+			want: []Item{
+				{
+					Name:       "test-configmap",
+					Namespaces: "test",
+				},
+				{
+					Name:       "test-different",
+					Namespaces: "test",
+				},
+			},
 			wantErr: false,
 		},
 	}
@@ -86,20 +199,6 @@ func TestStore_GetUnusedConfigMaps(t *testing.T) {
 }
 
 func TestStore_GetUnusedPersistentVolumeClaims(t *testing.T) {
-	fakeClientSet := fake.NewSimpleClientset(
-		&apiv1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "test",
-			},
-		},
-		&apiv1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-different",
-				Namespace: "test",
-			},
-		},
-	)
 	type fields struct {
 		Context                    context.Context
 		Namespaces                 []string
@@ -129,10 +228,16 @@ func TestStore_GetUnusedPersistentVolumeClaims(t *testing.T) {
 					Namespaces: "test",
 				}},
 			},
-			want: []Item{{
-				Name:       "test-different",
-				Namespaces: "test",
-			}},
+			want: []Item{
+				{
+					Name:       "test-different",
+					Namespaces: "test",
+				},
+				{
+					Name:       "test-persistent-volume",
+					Namespaces: "test",
+				},
+			},
 			wantErr: false,
 		},
 	}
@@ -160,20 +265,6 @@ func TestStore_GetUnusedPersistentVolumeClaims(t *testing.T) {
 }
 
 func TestStore_GetUnusedSecrets(t *testing.T) {
-	fakeClientSet := fake.NewSimpleClientset(
-		&apiv1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "test",
-			},
-		},
-		&apiv1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-different",
-				Namespace: "test",
-			},
-		},
-	)
 	type fields struct {
 		Context                    context.Context
 		Namespaces                 []string
@@ -203,10 +294,16 @@ func TestStore_GetUnusedSecrets(t *testing.T) {
 				usedServiceAccounts:        nil,
 				usedPersistentVolumeClaims: nil,
 			},
-			want: []Item{{
-				Name:       "test-different",
-				Namespaces: "test",
-			}},
+			want: []Item{
+				{
+					Name:       "test-different",
+					Namespaces: "test",
+				},
+				{
+					Name:       "test-secret",
+					Namespaces: "test",
+				},
+			},
 			wantErr: false,
 		},
 	}
@@ -234,20 +331,6 @@ func TestStore_GetUnusedSecrets(t *testing.T) {
 }
 
 func TestStore_GetUnusedServiceAccounts(t *testing.T) {
-	fakeClientSet := fake.NewSimpleClientset(
-		&apiv1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "test",
-			},
-		},
-		&apiv1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-different",
-				Namespace: "test",
-			},
-		},
-	)
 	type fields struct {
 		Context                    context.Context
 		Namespaces                 []string
@@ -277,10 +360,16 @@ func TestStore_GetUnusedServiceAccounts(t *testing.T) {
 				}},
 				usedPersistentVolumeClaims: nil,
 			},
-			want: []Item{{
-				Name:       "test-different",
-				Namespaces: "test",
-			}},
+			want: []Item{
+				{
+					Name:       "test-different",
+					Namespaces: "test",
+				},
+				{
+					Name:       "test-service-account",
+					Namespaces: "test",
+				},
+			},
 			wantErr: false,
 		},
 	}
@@ -322,7 +411,31 @@ func TestStore_GetUsedResources(t *testing.T) {
 		fields  fields
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "test",
+			fields: fields{
+				Context:    context.Background(),
+				Namespaces: []string{"test"},
+				CoreV1:     fakeClientSet.CoreV1(),
+				//usedSecrets: []Item{{
+				//	Name:       "test",
+				//	Namespaces: "test",
+				//}},
+				//usedConfigMaps: []Item{{
+				//	Name:       "test",
+				//	Namespaces: "test",
+				//}},
+				//usedServiceAccounts: []Item{{
+				//	Name:       "test",
+				//	Namespaces: "test",
+				//}},
+				//usedPersistentVolumeClaims: []Item{{
+				//	Name:       "test",
+				//	Namespaces: "test",
+				//}},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
